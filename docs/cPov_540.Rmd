@@ -1,0 +1,271 @@
+---
+title: "Equity Report: Child Poverty"
+date: "Hannah Lewis and Michele Claibourn"
+output: 
+  html_document: 
+    fig_caption: yes
+    toc: true
+    toc_float: 
+      collapsed: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r libraries}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(formattable)
+library(leaflet)
+library(RColorBrewer)
+library(pander)
+```
+
+<br>
+
+<img src="images/big-compass-ob.png" style="float:left; width:15%; margin-right: 20px">
+
+```{r loadingb}
+state <- "VA"
+county <- "540"
+year <- 2017
+
+# Read in county codes table
+county_codes <- read_csv("county_codes.csv")
+row <- which(county_codes$code == county)
+
+filename <- paste("data/","cPov_",county,"_tract_",year,".RDS", sep = "")
+filename_geo <- paste("data/","cPov_",county,"_tract_",year,"_geo",".RDS", sep = "")
+
+# Load equity table
+equityTable_cPov <- readRDS(filename) 
+equityTable_cPov_geo <- readRDS(filename_geo) 
+```
+***
+
+# **`r county_codes[row, 3]`**
+
+<br>
+
+## What does this indicator measure
+Child poverty measures the percentage of children under age 18 who live in households with incomes at or below the federal poverty line in `r county_codes[row, 3]`. The federal poverty line was \$24,600 for a family of four in 2017. In `r year`, there were `r last(equityTable_cPov$cPov)` (+/- `r round(last(equityTable_cPov$cPov_moe),0)`) children living in poverty in `r county_codes[row, 3]`, `r round(last(equityTable_cPov$Per),1)`% of all children. 
+
+
+## Summary Table 
+Children under age 18 who live in poverty in `r county_codes[row, 3]`
+
+|             | Total Children | White Children | Black Children | Hispanic Children | Black-White Disparity | Hispanic-White Disparity | 
+|------------|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|
+| **Children in poverty** | `r last(equityTable_cPov$cPov)` | `r last(equityTable_cPov$cPov_A)` | `r last(equityTable_cPov$cPov_B)` | `r last(equityTable_cPov$cPov_C)` |  |  | 
+| **Child population**    | `r last(equityTable_cPov$pop)`  | `r last(equityTable_cPov$pop_A)` | `r last(equityTable_cPov$pop_B)` | `r last(equityTable_cPov$pop_C)` |  |  |  
+| **Child poverty rate**  | `r round(last(equityTable_cPov$Per),1)`% | `r round(last(equityTable_cPov$Per_A),1)`% | `r round(last(equityTable_cPov$Per_B),1)`% | `r round(last(equityTable_cPov$Per_C),1)`% | `r round(last(equityTable_cPov$Ratio_B),1)` | `r round(last(equityTable_cPov$Ratio_C),1)` | 
+
+**Data Source:** U.S. Census Bureau; American Community Survey, 2013-2017, derived from Tables B01001, B01001H, B01001B, B01001I, B17001, B17001H, B17001B, and B17001I.
+
+**Data Explanation:** Local child population and children in poverty estimates are from the American Community Survey 5-Year Estimates, 2013-2017. Sent to approximately 3.5 million addresses per year, the 5-year survey estimates provide up-to-date estimates for localities that may be changing between censuses. As these are estimates derived from surveys, and thus subject to variability due to sampling error, margins of error are included in the tables below. 
+
+
+### Disparity Ratio 
+The disparity ratio is the percentage of black or Hispanic children living in poverty divided by the percentage of white children living in poverty. A disparity ratio of 1 reflects racial equality; values greater than one suggest higher rates of poverty among black or Hispanic children compared to white children while values less than 1 suggest lower rates of poverty among black or Hispanic children. 
+
+* In `r county_codes[row, 3]`, black children experience poverty at notably greater rates than do white children. The disparity ratio shows that black children are `r round(last(equityTable_cPov$Ratio_B),1)` times more likely to live in households with incomes at or below the federal poverty line. 
+* In `r county_codes[row, 3]`, Hispanic children experience poverty at somewhat greater rates than do white children. The disparity ratio shows that Hispanic children are `r round(last(equityTable_cPov$Ratio_C),1)` times more likely to live in households with incomes at or below the federal poverty line.
+
+
+## Child Poverty by Census Tract
+
+Within each map, clicking on a tract will show the estimated child population, the estimated children in poverty, and the estimated poverty rate. For child poverty, lighter colors show lower poverty rates and darker colors show higher poverty rates. 
+
+
+### Child Poverty among Black Children
+
+```{r map1b, out.width = '100%'}
+# child poverty-black
+# define popup info
+popup <- paste0("Child Population: ", equityTable_cPov_geo$pop_B,
+                "<br>", "Children in Poverty: ", equityTable_cPov_geo$cPov_B,
+                "<br>", "Child Poverty Rate: ", round(equityTable_cPov_geo$Per_B, 2),
+                "<br>", "Tract: ", equityTable_cPov_geo$NAME)
+
+min <- min(c(equityTable_cPov_geo$Per_B, equityTable_cPov_geo$Per_A), na.rm = TRUE)
+max <- max(c(equityTable_cPov_geo$Per_B, equityTable_cPov_geo$Per_A), na.rm = TRUE)+1
+
+# define palette
+# Define the number of colors you want
+nb.cols <- 20
+mycolors <- colorRampPalette(brewer.pal(8, "YlGnBu"))(nb.cols)
+
+pal <- colorNumeric(palette = mycolors,
+                    domain = min:max)
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  # addTiles() %>% # to show streets more prominently
+  addPolygons(data = equityTable_cPov_geo,
+              fillColor = ~pal(equityTable_cPov_geo$Per_B),
+              fillOpacity = 0.5,
+              color = "white",
+              weight = 2,
+              smoothFactor = 0.2,
+              popup = popup,
+              highlight = highlightOptions(
+                weight = 5,
+                fillOpacity = 0.7,
+                bringToFront = TRUE)) %>%
+  addLegend(pal = pal,
+            values = equityTable_cPov_geo$Per_B,
+            position = "bottomright",
+            opacity = 0.5,
+            title = paste("Child Poverty Rate<br>among Black Children<br>in ",year, sep = ""))
+```
+
+Among the tracts that stand out for high poverty rates among black children, three contain sizeable estimated populations of black children. 
+
+* Tract 4.01, containing the Ridge Street neighborhood, has an estimated population of 480 black children and an estimated poverty rate of 83%. 
+* Tract 4.02, covering the Belmont neighborhood, has an estimated population of 241 black children and an estimated poverty rate of 53%.
+* Tract 5.01, situated in the Fifeville neighborhood, has an estimated population of 667 black children and an estimated poverty rate of 33%
+
+Additional tracts with high estimated poverty rates are based in geographies with small estimated populations of black children. 
+
+* Tract 10, largely covering the North Downtown neighborhood, has an estimated population of only 22 black children and an estimated poverty rate of 91%. 
+* Tract 6, situated within the Jefferson Park Avenue neighborhood, has an estimated population of 35 black children and an estimated poverty rate of 63%. 
+
+
+### Child Poverty among Hispanic Children
+
+```{r map2b, out.width = '100%'}
+# child poverty-Hispanic
+# define popup info
+popup <- paste0("Child Population: ", equityTable_cPov_geo$pop_C,
+                "<br>", "Children in Poverty: ", equityTable_cPov_geo$cPov_C,
+                "<br>", "Child Poverty Rate: ", round(equityTable_cPov_geo$Per_C, 2),
+                "<br>", "Tract: ", equityTable_cPov_geo$NAME)
+
+min <- min(c(equityTable_cPov_geo$Per_C, equityTable_cPov_geo$Per_A), na.rm = TRUE)
+max <- max(c(equityTable_cPov_geo$Per_C, equityTable_cPov_geo$Per_A), na.rm = TRUE)+1
+
+# define palette
+# Define the number of colors you want
+nb.cols <- 20
+mycolors <- colorRampPalette(brewer.pal(8, "YlGnBu"))(nb.cols)
+
+pal <- colorNumeric(palette = mycolors,
+                    domain = min:max)
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  # addTiles() %>% # to show streets more prominently
+  addPolygons(data = equityTable_cPov_geo,
+              fillColor = ~pal(equityTable_cPov_geo$Per_C),
+              fillOpacity = 0.5,
+              color = "white",
+              weight = 2,
+              smoothFactor = 0.2,
+              popup = popup,
+              highlight = highlightOptions(
+                weight = 5,
+                fillOpacity = 0.7,
+                bringToFront = TRUE)) %>%
+  addLegend(pal = pal,
+            values = equityTable_cPov_geo$Per_C,
+            position = "bottomright",
+            opacity = 0.5,
+            title = paste("Child Poverty Rate<br>among Hispanic Children<br>in ",year, sep = ""))
+```
+
+Among the tracts that stand out for high poverty rates among Hispanic children, only one contains a sizeable estimated population of Hispanic children. 
+
+* Tract 8, containing The Meadows and Greenbrier neighbhorhoods, has an estimated population of 326 Hispanic children and an estiamted poverty rate of 35%. 
+
+Additional tracts with high estimated poverty rates are based in geographies with small estimated populations of Hispanic children. 
+
+* Tract 2.01, intersecting with the Rose Hill neighborhood and a part of Venable, has an estimated population of only 11 Hispanic children making the estimated poverty rates of 46% very uncertain.
+
+
+### Child Poverty among White Children
+
+```{r map3b, out.width = '100%'}
+# child poverty-white
+# define popup info
+popup <- paste0("Child Population: ", equityTable_cPov_geo$pop_A,
+                "<br>", "Children in Poverty: ", equityTable_cPov_geo$cPov_A,
+                "<br>", "Child Poverty Rate: ", round(equityTable_cPov_geo$Per_A, 2),
+                "<br>", "Tract: ", equityTable_cPov_geo$NAME)
+# define palette
+pal <- colorNumeric(palette = mycolors,
+                    domain = min:max)
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  # addTiles() %>% # to show streets more prominently
+  addPolygons(data = equityTable_cPov_geo,
+              fillColor = ~pal(equityTable_cPov_geo$Per_A),
+              fillOpacity = 0.5,
+              color = "white",
+              weight = 2,
+              smoothFactor = 0.2,
+              popup = popup,
+              highlight = highlightOptions(
+                weight = 5,
+                fillOpacity = 0.7,
+                bringToFront = TRUE)) %>%
+  addLegend(pal = pal,
+            values = equityTable_cPov_geo$Per_A,
+            position = "bottomright",
+            opacity = 0.5,
+            title = paste("Child Poverty Rate<br>among White Children<br>in ",year, sep = ""))
+```
+
+Child poverty among white children is less throughout Charlottesville. Three Census tracts have poverty rates over 20% with sizeable estimated population of white children. 
+
+* Tract 4.01, containing the Ridge Street neighborhood, has an estimated population of 192 white children and an estiamted poverty rate of 38%. 
+* Tract 5.01, situated in the Fifeville neighborhood, has an estimated population of 172 white children and an estimated poverty rate of 26%. 
+* Tract 4.02, covering the Belmont neighborhoo, has an estimated population of 387 white children and an estimated poverty rate of 21%.
+
+The same three tracts have high rates of child poverty among black children. In tract 5.01, the rates among black and white children are quite similar.
+
+
+## Data Tables
+The following tables show the population estimates and poverty rates for each census tract. The tables also provide the margains of error associated with each estimate. ACS data is based on a sample and so estimates contain a degree of uncertainty. Larger margins mean the estimate is less accurate. Typically the larger the sample size, the smaller the margin of error. This means in cases where the population of interest is very small (very few children live in a census tract), estimates can be very unreliable. 
+
+### Missing values
+In the poverty rate table, NaN's exist when there is division by zero, that is, when the population of interest in that census tract is estimated to be zero. Poverty rate estimates of zero occur when the number of children estimated to be in poverty is zero.
+
+
+### Population Estimates Table
+
+```{r poptableb}
+tbl <- equityTable_cPov %>%
+  select(NAME:pop_moe_C) %>%
+  mutate(Tract = str_remove(NAME, paste(", ", county_codes[row,3], ", Virginia", sep="")),
+         Children = paste(pop, "(", "+/-", round(pop_moe, 0), ")"),
+         White = paste(pop_A, "(", "+/-", round(pop_moe_A, 0), ")"),
+         Black = paste(pop_B, "(", "+/-", round(pop_moe_B, 0), ")"),
+         Hispanic = paste(pop_C, "(", "+/-", round(pop_moe_C, 0), ")")) %>%
+  select(Tract, Children, White, Black, Hispanic) %>%
+  mutate(Tract = str_remove(Tract, ", Virginia"))
+
+kable(tbl, align = c('l','c','c','c','c'), digits = 0) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+     footnote(general = "Margins of error are shown in parentheses and indicate that the population could be more or less than the estimate by the value of the margin of error.")
+```
+
+### Poverty Rate Estimates Table
+
+```{r povtableb}
+tbl <- equityTable_cPov %>% select(NAME,Per:Per_moe_C) %>%
+  mutate(Tract = str_remove(NAME, paste(", ", county_codes[row,3], ", Virginia", sep="")),
+         `Pov Rate` = paste(round(Per,1), "(", "+/-", round(Per_moe,1), ")"),
+         `Pov Rate-White` = paste(round(Per_A,1), "(", "+/-", round(Per_moe_A,1), ")"),
+         `Pov Rate-Black` = paste(round(Per_B,1), "(", "+/-", round(Per_moe_B,1), ")"),
+         `Pov Rate-Hispanic` = paste(round(Per_C,1), "(", "+/-", round(Per_moe_C,1), ")")) %>%
+  select(Tract, `Pov Rate`, `Pov Rate-White`, `Pov Rate-Black`, `Pov Rate-Hispanic`) %>%
+  mutate(Tract = str_remove(Tract, ", Virginia"))
+
+kable(tbl, align = c('l', 'c', 'c','c','c'), digits = 1) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+     footnote(general = "Margins of error are shown in parentheses and indicate that the poverty rates could be more or less than the estimate by the value of the margin of error.")
+```

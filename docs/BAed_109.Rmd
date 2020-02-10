@@ -1,0 +1,273 @@
+---
+title: "Equity Report: Bachelor Degree Attainment"
+date: "Hannah Lewis and Michele Claibourn"
+output: 
+  html_document: 
+    fig_caption: yes
+    toc: true
+    toc_float: 
+      collapsed: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r libraries}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(formattable)
+library(leaflet)
+library(RColorBrewer)
+library(pander)
+```
+
+<br>
+
+<img src="images/big-compass-ob.png" style="float:left; width:15%; margin-right: 20px">
+
+```{r loading}
+# Define state, Census tract, ACS 5-year survey you wish to pull from, and the degree level you are interested in
+# where level = 
+#       HS: High School degree (or equivalent) or higher
+#       ASS: Some college, an Associates degree or higher
+#       BA: Bachelors Degree or higher
+
+state <- "VA"
+county <- "109"
+year <- 2017
+level <- 'BA'
+
+# narratively define level
+if(level == 'HS'){
+  degree <- 'High School'
+}else if(level == 'ASS'){
+  degree <- 'Associates'
+}else if(level == 'BA'){
+  degree <- 'Bachelors'
+}
+
+# Read in county codes table
+county_codes <- read_csv("county_codes.csv")
+row <- which(county_codes$code == county)
+
+# Load specific file
+filename <- paste("data/", level, "ed_",county,"_tract_", year,".RDS", sep = "")
+filename_geo <- paste("data/", level, "ed_",county,"_tract_", year,"_geo",".RDS", sep = "")
+
+# Load equity table
+equityTable_ed<- readRDS(filename) 
+equityTable_ed_geo <- readRDS(filename_geo)
+```
+
+***
+# **`r county_codes[row, 3]`**
+
+<br>
+
+### What does this indicator measure
+`r degree` Degree Attainment Population measures the percentage of `r county_codes[row, 3]` adults over age 25 with a `r degree` degree or higher (equivalency also counted). In `r year`, there were `r last(equityTable_ed$ed)` (+/- `r round(last(equityTable_ed$ed_moe),0)`) adults over age 25 with a `r degree` degree, `r round(last(equityTable_ed$Per),1)`% of all adults over 25. 
+
+***
+
+## Summary Table
+Adults age 25 and over that have obtained a `r degree` degree or higher in `r county_codes[row, 3]`
+
+|             | Total Adults | White Adults | Black Adults | Hispanic Adults | Black-White Disparity | Hispanic-White Disparity | 
+|------------|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|
+| **Adults with a `r degree` degree or higher** | `r last(equityTable_ed$ed)` | `r last(equityTable_ed$ed_H)` | `r last(equityTable_ed$ed_B)` | `r last(equityTable_ed$ed_I)` |  |  | 
+| **Adult population**    | `r last(equityTable_ed$pop)`  | `r last(equityTable_ed$pop_H)` | `r last(equityTable_ed$pop_B)` | `r last(equityTable_ed$pop_I)` |  |  |  
+| **`r degree` Degree Attainment rate**  | `r round(last(equityTable_ed$Per),1)`% | `r round(last(equityTable_ed$Per_H),1)`% | `r round(last(equityTable_ed$Per_B),1)`% | `r round(last(equityTable_ed$Per_I),1)`% | `r round(last(equityTable_ed$Ratio_B),1)` | `r round(last(equityTable_ed$Ratio_I),1)` | 
+
+**Data Source:** U.S. Census Bureau; American Community Survey, 2013-2017, Derived from tables B15002, C15002H, C15002I, and C15002B.
+
+**Data Explanation:** Local population and educational attainment estimates are from the American Community Survey 5-Year Estimates, 2013-2017. Sent to approximately 3.5 million addresses per year, the 5-year survey estimates provide up-to-date estimates for localities that may be changing between censuses. As these are estimates derived from surveys, and thus subject to variability due to sampling error, margins of error are included in the tables below. 
+
+***
+### Disparity Ratio 
+The disparity ratio is the percentage of black or hispanic adults (over 25) who have attained a `r degree` degree or higher divided by the percentage of white adults (over 25) who have attained a `r degree` degree or higher. A disparity ratio of 1 reflects racial equality; values *lower* than 1 suggest lower educational attainment rates among black or hispanic adults (over 25) compared to whites. Ratios greater than 1 suggest higher educational attainment rates among black or hispanic adults (over 25). 
+
+* In `r county_codes[row, 3]`, black residents have a notably lower rate of Bachelor degree attainment than do white residents. The disparity ratio shows that black residents are only `r round(last(equityTable_ed$Ratio_B),1)` as likely to have a 4-year college degree. 
+* In `r county_codes[row, 3]`, Hispanic residents have a lower rate of Bachelor degree attainment than do wite residents. The disparity ratio shows that Hispanic residents are only `r round(last(equityTable_ed$Ratio_I),1)` times as likely to have a 4-year college degree.
+
+***
+
+## `r degree` Degree Attainment by Census Tract
+
+Within each map, clicking on a tract will show the estimated adult (over 25) population, the estimated number of adults with a `r degree` degree or higher,  and the estimated degree attainment rate. For educational attainment, lighter colors show lower educational attainment rates and darker colors show higher educational attainment rates. 
+
+
+### `r degree` Degree Attainment among Black Adults over 25
+
+```{r map1, out.width = '100%'}
+# degree attainment-black
+# define popup info
+popup <- paste0("Population (25+): ", equityTable_ed_geo$pop_B,
+                "<br>", paste(degree," Degrees: ", sep = ""), equityTable_ed_geo$ed_B,
+                "<br>", paste(degree," Degree Attainment Rate: ", sep = ""), round(equityTable_ed_geo$Per_B, 2),
+                "<br>", "Tract: ", equityTable_ed_geo$NAME)
+
+min <- min(c(equityTable_ed_geo$Per_B, equityTable_ed_geo$Per_H), na.rm = TRUE)
+max <- max(c(equityTable_ed_geo$Per_B, equityTable_ed_geo$Per_H), na.rm = TRUE)+1
+
+# define palette
+# Define the number of colors you want
+nb.cols <- 20
+mycolors <- colorRampPalette(brewer.pal(8, "YlGnBu"))(nb.cols)
+
+pal <- colorNumeric(palette = mycolors,
+                    domain = min:max)
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  # addTiles() %>% # to show streets more prominently
+  addPolygons(data = equityTable_ed_geo,
+              fillColor = ~pal(equityTable_ed_geo$Per_B),
+              fillOpacity = 0.5,
+              color = "white",
+              weight = 2,
+              smoothFactor = 0.2,
+              popup = popup,
+              highlight = highlightOptions(
+                weight = 5,
+                fillOpacity = 0.7,
+                bringToFront = TRUE)) %>%
+  addLegend(pal = pal,
+            values = equityTable_ed_geo$Per_B,
+            position = "bottomright",
+            opacity = 0.5,
+            title = paste(degree," Degree Attainment<br>among Black or African American Adults (25+)", sep = ""))
+```
+
+Within Louisa County, the estimated degree attainment among black residents across the Census tracts varies from 0 to 22%.
+
+* Tract 9502.02, containing the Town of Mineral and surrounding region, has the highest estimated degree attainment rate among black adults, at 22%, with an estimated population of 474 black adults.
+* Both Tract 9501, stretching from Lake Anna in the north of the county and down to the southern edge, and tract 9505, in the southeast corner of the county, have an estimated degree attainment rate among black adults of 0%, with estimated populations of 843 and 549 black adults.
+
+### `r degree` Degree Attainment among Hispanic Adults over 25
+
+```{r map2, out.width = '100%'}
+#  degree attainment-black
+# define popup info
+popup <- paste0("Population (25+): ", equityTable_ed_geo$pop_I,
+                "<br>", paste(degree," Degrees: ", sep = ""), equityTable_ed_geo$ed_I,
+                "<br>", paste(degree," Degree Attainment Rate: ", sep = ""), round(equityTable_ed_geo$Per_I, 2),
+                "<br>", "Tract: ", equityTable_ed_geo$NAME)
+
+min <- min(c(equityTable_ed_geo$Per_I, equityTable_ed_geo$Per_H), na.rm = TRUE)
+max <- max(c(equityTable_ed_geo$Per_I, equityTable_ed_geo$Per_H), na.rm = TRUE)+1
+# define palette
+pal <- colorNumeric(palette = mycolors,
+                    domain = min:max)
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  # addTiles() %>% # to show streets more prominently
+  addPolygons(data = equityTable_ed_geo,
+              fillColor = ~pal(equityTable_ed_geo$Per_I),
+              fillOpacity = 0.5,
+              color = "white",
+              weight = 2,
+              smoothFactor = 0.2,
+              popup = popup,
+              highlight = highlightOptions(
+                weight = 5,
+                fillOpacity = 0.7,
+                bringToFront = TRUE)) %>%
+  addLegend(pal = pal,
+            values = equityTable_ed_geo$Per_I,
+            position = "bottomright",
+            opacity = 0.5,
+            title = paste(degree," Degree Attainment<br>among Hispanic or Latino Adults (25+)", sep = ""))
+```
+
+The estimated degree attainment rate within Census tracts for Hispanics residents in Louisa county varies from 0% to 50%, but only a few of these tracts have more than 100 estimated Hispanic adults in residence. 
+
+* Tract 9502.02, containing the Town of Mineral and surrounding region, with an estimated population of 129 Hispanic adults and an estimated degree attainment rate of 39%.
+* Tract 9501, stretching from Lake Anna in the north of the county and down to the southern edge, with an estimated population of 135 Hispanic adults and an estimated degree attainment rate of 17%.
+* Tract 9503, in the western reginon of the county, with an estimated population of 104 Hispanic adults and an estimated degree attainment rate of 0%.
+
+### `r degree` Degree Attainment among White Adults over 25
+
+```{r map3, out.width = '100%'}
+# degree attainment-white
+# define popup info
+popup <- paste0("Population (25+): ", equityTable_ed_geo$pop_H,
+                "<br>", paste(degree," Degrees: ", sep = ""), equityTable_ed_geo$ed_H,
+                "<br>", paste(degree," Degree Attainment Rate: ", sep = ""), round(equityTable_ed_geo$Per_H, 2),
+                "<br>", "Tract: ", equityTable_ed_geo$NAME)
+
+# define palette
+pal <- colorNumeric(palette = "YlGnBu",
+                    domain = min:max)
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  # addTiles() %>% # to show streets more prominently
+  addPolygons(data = equityTable_ed_geo,
+              fillColor = ~pal(equityTable_ed_geo$Per_H),
+              fillOpacity = 0.5,
+              color = "white",
+              weight = 2,
+              smoothFactor = 0.2,
+              popup = popup,
+              highlight = highlightOptions(
+                weight = 5,
+                fillOpacity = 0.7,
+                bringToFront = TRUE)) %>%
+  addLegend(pal = pal,
+            values = equityTable_ed_geo$Per_H,
+            position = "bottomright",
+            opacity = 0.5,
+            title = paste(degree," Degree Attainment<br>among White Adults (25+)", sep = ""))
+```
+
+The estimated degree attainment rate within Census tracts for White residents in Louisa county is fairly uniform, ranging between 18% and 36%.
+
+* Tract 9504, in the central southern region of the county, has the highest estimated degree attainment rate among white adults, at 36%, with an estimated population of 1,586 white adults.
+* Tract 9505, in the southeast corner of the county, has the lowest estimated degree attainment rate amogn white adults, at 18%, with an estimated population of 3,428 white adults.
+
+***
+## Data Tables
+The following tables show the population estimates and `r degree` degree attainment rates for each census tract. The tables also provide the margains of error associated with each estimate. ACS data is based on a sample and so estimates contain a degree of uncertainty. Larger margins mean the estimate is less accurate. Typically the larger the sample size, the smaller the margin of error. This means in cases where the population of interest is very small (very few adults (over 25) live in a census tract), estimates can be very unreliable. 
+
+### Missing values
+In the `r degree` degree attainment rate table, NaN's exist when there is division by zero, that is, when the population of interest in that census tract is estimated to be zero. `r degree` degree attainment rate estimates of zero occur when the number of `r degree` degrees or higher earned in that census tract is zero.
+
+***
+
+### Population Estimates Table
+```{r poptable}
+tbl <- equityTable_ed %>%
+  select(NAME:pop_moe_I) %>%
+  mutate(Tract = str_remove(NAME, paste(", ", county_codes[row,3], ", Virginia", sep="")),
+         "Adults (Over 25)" = paste(pop, "(", "+/-", round(pop_moe, 0), ")"),
+         White = paste(pop_H, "(", "+/-", round(pop_moe_H, 0), ")"),
+         Black = paste(pop_B, "(", "+/-", round(pop_moe_B, 0), ")"),
+         Hispanic = paste(pop_I, "(", "+/-", round(pop_moe_I, 0), ")")) %>%
+  select(Tract, "Adults (Over 25)", White, Black, Hispanic) %>%
+  mutate(Tract = str_remove(Tract, ", Virginia"))
+
+kable(tbl, align = c('l','c','c','c','c'), digits = 0) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+     footnote(general = "Margins of error are shown in parentheses and indicate that the population could be more or less than the estimate by the value of the margin of error.")
+```
+
+### `r degree` Degree Attainment Rate Estimates Table
+
+```{r HSedtable}
+tbl <- equityTable_ed %>% select(NAME,Per:Per_moe_I) %>%
+  mutate(Tract = str_remove(NAME, paste(", ", county_codes[row,3], ", Virginia", sep="")),
+         `Degree Rate` = paste(round(Per,1), "(", "+/-", round(Per_moe,1), ")"),
+         `Degree Rate-White` = paste(round(Per_H,1), "(", "+/-", round(Per_moe_H,1), ")"),
+         `Degree Rate-Black` = paste(round(Per_B,1), "(", "+/-", round(Per_moe_B,1), ")"),
+         `Degree Rate-Hispanic` = paste(round(Per_I,1), "(", "+/-", round(Per_moe_I,1), ")")) %>%
+  select(Tract, `Degree Rate`, `Degree Rate-White`, `Degree Rate-Black`, `Degree Rate-Hispanic`) %>%
+  mutate(Tract = str_remove(Tract, ", Virginia"))
+
+kable(tbl, align = c('l', 'c', 'c','c','c'), digits = 1) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+     footnote(general = "Margins of error are shown in parentheses and indicate that the poverty rates could be more or less than the estimate by the value of the margin of error.")
+```

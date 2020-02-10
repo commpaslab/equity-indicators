@@ -1,0 +1,24 @@
+name: "CommPAS Lab: Regional Equity Indicators"
+output_dir: '.'
+navbar:
+  title: "CommPAS Lab"
+  left:
+  - text: "Home"
+    href: index.html
+  - text: "Child Poverty"
+    href: childpov.html
+  - text: "Education"
+    href: education.html
+right:
+  - icon: "fa fa-envelope"
+    href: mailto:mclaibourn@virginia.edu
+  - icon: "fa fa-github"
+    href: http://github.com/commpas/equity-indicators/
+output:
+  html_document:
+    lib_dir: site_libs
+    css: 'styles.css'
+    theme: spacelab
+    include:
+      after_body: footer.html
+    self_contained: FALSE

@@ -1,0 +1,19 @@
+---
+title: "Equity Report: Child Poverty"
+date: "Hannah Lewis and Michele Claibourn"
+output: 
+  html_document: 
+    fig_caption: yes
+    toc: yes
+    toc_float: true
+---
+
+# Background on Race and Child Poverty in Region
+
+TBA: Background and context...
+
+## Race and Child Poverty by Locality
+
+* [Albemarle County](cPov_003.html)
+* [Charlottesville City](cPov_540.html)
+* [Louisa County](cPov_109.html)

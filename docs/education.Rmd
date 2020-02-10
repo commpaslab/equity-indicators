@@ -1,0 +1,21 @@
+---
+title: "Equity Report: Educational Attainment"
+date: "Hannah Lewis and Michele Claibourn"
+output: 
+  html_document: 
+    fig_caption: yes
+    toc: yes
+    toc_float: true
+---
+
+# Background on Race and Education in Region
+
+TBA: Background and context...
+
+## Race and BA Degree Attainment by Locality
+
+* [Albemarle County](BAed_003.html)
+* [Charlottesville City](BAed_540.html)
+* [Louisa County](BAed_109.html)
+
+## Race and HS Degree Attainment by Locality
