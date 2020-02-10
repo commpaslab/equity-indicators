@@ -1,0 +1,258 @@
+---
+title: "Equity Report: Child Poverty"
+author: "[UVA CommPAS Lab](http://commpas-lab.mystrikingly.com/)"
+date: "Hannah Lewis and Michele Claibourn"
+output: 
+  html_document:
+    theme: spacelab
+    highlight: tango
+    toc: true
+    toc_depth: 2
+---
+
+```{r, echo=FALSE}
+htmltools::img(src = knitr::image_uri(file.path(getwd(), "big-compass.png")), 
+               alt = 'commpas', 
+               style = 'position:absolute; top:0; right:0; padding:20px; height:225px')
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r loading}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(formattable)
+library(leaflet)
+library(RColorBrewer)
+library(pander)
+
+state <- "VA"
+county <- "540"
+year <- 2017
+
+# Read in county codes table
+county_codes <- read_csv("county_codes.csv")
+row <- which(county_codes$code == county)
+
+filename <- paste("HSed_",county,"_tract_",year,".RDS", sep = "")
+filename_geo <- paste("HSed_",county,"_tract_",year,"_geo",".RDS", sep = "")
+
+# Load equity table
+equityTable_HSed <- readRDS(filename) 
+equityTable_HSed_geo <- readRDS(filename_geo) 
+```
+
+***
+### About the Indicator Reports
+The following report presents an equity indicator, inspired by efforts like that of [St. Louis Equity Indicators Project](https://www.stlouis-mo.gov/government/departments/mayor/initiatives/resilience/equity/index.cfm) emphasizing racial or ethnic disparities in measures of community well-being. The goal is to make indicators from sources like the U.S. Census American Communit Survey readily accessible and reproducible. Indicators derived from sampled data, like the American Community Survey are measured with uncertainty and we aim to make that uncertainy apparent.
+
+The prototype report focuses on child poverty and contains three sections: 
+
+* Regional summaries, providing an explanation of the indicator, a summary table showing outcomes for selected population groups in the region along with disparity ratios, and details about the data source; 
+* Maps by census tract, mapping the indicator for each selected population, to help reveal variations within the locality;
+* Population and rate tables, showing the population counts and indicator for each selected population group by tract along witn the margins of error to make plain the uncertainty around some estimates at this smaller geographic level. The indicator values from this table are the values represented in the maps. 
+
+***
+
+***
+
+# **High School Degree Attainment Rate in `r county_codes[row, 3]`**
+
+### What does this indicator measure
+High School Graduate Population measures the percentage of `r county_codes[row, 3]` adults over age 25 with at least a high school degree (equivalency - the GRE - is also counted_. In `r year`, there were `r last(equityTable_HSed$HSed)` (+/- `r round(last(equityTable_HSed$HSed_moe),0)`) adults over age 25 with at least a high school degree, `r round(last(equityTable_HSed$Per),1)`% of all adults over 25. 
+
+***
+
+## Summary Table
+Adults age 25 and over that have obtained at least a high school degree in `r county_codes[row, 3]`
+
+|             | Total Adults | White Adults | Black Adults | Hispanic Adults | Black-White Disparity | Hispanic-White Disparity | 
+|------------|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|
+| **Adults with at least a High School Degree** | `r last(equityTable_HSed$HSed)` | `r last(equityTable_HSed$HSed_A)` | `r last(equityTable_HSed$HSed_B)` | `r last(equityTable_HSed$HSed_C)` |  |  | 
+| **Adult population**    | `r last(equityTable_HSed$pop)`  | `r last(equityTable_HSed$pop_A)` | `r last(equityTable_HSed$pop_B)` | `r last(equityTable_HSed$pop_C)` |  |  |  
+| **High School Degree Attainment rate**  | `r round(last(equityTable_HSed$Per),1)`% | `r round(last(equityTable_HSed$Per_A),1)`% | `r round(last(equityTable_HSed$Per_B),1)`% | `r round(last(equityTable_HSed$Per_C),1)`% | `r round(last(equityTable_HSed$Ratio_B),1)` | `r round(last(equityTable_HSed$Ratio_C),1)` | 
+
+**Data Source:** U.S. Census Bureau; American Community Survey, 2013-2017, Derived from tables B15002, C15002H, C15002I, and C15002B.
+
+**Data Explanation:** Local population and educational attainment estimates are from the American Community Survey 5-Year Estimates, 2013-2017. Sent to approximately 3.5 million addresses per year, the 5-year survey estimates provide up-to-date estimates for localities that may be changing between censuses. As these are estimates derived from surveys, and thus subject to variability due to sampling error, margins of error are included in the tables below. 
+
+***
+### Disparity Ratio 
+The disparity ratio is the percentage of black or hispanic adults (over 25) who have attained at least a High School education divided by the percentage of white adults (over 25) who have attained at least a High School education. A disparity ratio of 1 reflects racial equality; values *lower* than 1 suggest lower educational attainment rates among black or hispanic adults (over 25) compared to whites. Ratios greater than 1 suggest higher educational attainment rates among black or hispanic adults (over 25). 
+
+***
+
+## High School Degree Attainment by Census Tract
+
+Within each map, clicking on a tract will show the estimated child population, the estimated children in poverty, and the estimated poverty rate. For child poverty, lighter colors show lower poverty rates and darker colors show higher poverty rates. 
+
+**High School Degree Attainment among Black Adults over 25**
+
+```{r map1, out.width = '100%'}
+# high school degree attainment-black
+# define popup info
+popup <- paste0("Population (25+): ", equityTable_HSed_geo$pop_B,
+                "<br>", "High school Degrees: ", equityTable_HSed_geo$HSed_B,
+                "<br>", "High School Degree Attainment Rate: ", round(equityTable_HSed_geo$Per_B, 2),
+                "<br>", "Tract: ", equityTable_HSed_geo$NAME)
+
+min <- min(c(equityTable_HSed_geo$Per_B, equityTable_HSed_geo$Per_A), na.rm = TRUE)
+max <- max(c(equityTable_HSed_geo$Per_B, equityTable_HSed_geo$Per_A), na.rm = TRUE)+1
+
+# define palette
+# Define the number of colors you want
+nb.cols <- 20
+mycolors <- colorRampPalette(brewer.pal(8, "YlGnBu"))(nb.cols)
+
+pal <- colorNumeric(palette = mycolors,
+                    domain = min:max)
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  # addTiles() %>% # to show streets more prominently
+  addPolygons(data = equityTable_HSed_geo,
+              fillColor = ~pal(equityTable_HSed_geo$Per_B),
+              fillOpacity = 0.5,
+              color = "white",
+              weight = 2,
+              smoothFactor = 0.2,
+              popup = popup,
+              highlight = highlightOptions(
+                weight = 5,
+                fillOpacity = 0.7,
+                bringToFront = TRUE)) %>%
+  addLegend(pal = pal,
+            values = equityTable_HSed_geo$Per_B,
+            position = "bottomright",
+            opacity = 0.5,
+            title = "High School Degree Attainment<br>among Black Adults (25+)")
+```
+
+NOTE: Currently any descriptive text is added manually after examining the output.
+
+
+**High School Degree Attainment among Hispanic Adults over 25**
+
+```{r map2, out.width = '100%'}
+# high school degree attainment-black
+# define popup info
+popup <- paste0("Population (25+): ", equityTable_HSed_geo$pop_C,
+                "<br>", "High school Degrees: ", equityTable_HSed_geo$HSed_C,
+                "<br>", "High School Degree Attainment Rate: ", round(equityTable_HSed_geo$Per_C, 2),
+                "<br>", "Tract: ", equityTable_HSed_geo$NAME)
+
+min <- min(c(equityTable_HSed_geo$Per_C, equityTable_HSed_geo$Per_A), na.rm = TRUE)
+max <- max(c(equityTable_HSed_geo$Per_C, equityTable_HSed_geo$Per_A), na.rm = TRUE)+1
+
+# define palette
+
+pal <- colorNumeric(palette = mycolors,
+                    domain = min:max)
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  # addTiles() %>% # to show streets more prominently
+  addPolygons(data = equityTable_HSed_geo,
+              fillColor = ~pal(equityTable_HSed_geo$Per_C),
+              fillOpacity = 0.5,
+              color = "white",
+              weight = 2,
+              smoothFactor = 0.2,
+              popup = popup,
+              highlight = highlightOptions(
+                weight = 5,
+                fillOpacity = 0.7,
+                bringToFront = TRUE)) %>%
+  addLegend(pal = pal,
+            values = equityTable_HSed_geo$Per_C,
+            position = "bottomright",
+            opacity = 0.5,
+            title = "High School Degree Attainment<br>among Hispanic Adults (25+)")
+```
+
+NOTE: Currently any descriptive text is added manually after examining the output.
+
+
+**High School Degree Attainment among White Adults over 25**
+
+```{r map3, out.width = '100%'}
+# high school degree attainment-white
+# define popup info
+popup <- paste0("Population (25+): ", equityTable_HSed_geo$pop_A,
+                "<br>", "High school Degrees: ", equityTable_HSed_geo$HSed_A,
+                "<br>", "High School Degree Attainment Rate: ", round(equityTable_HSed_geo$Per_A, 2),
+                "<br>", "Tract: ", equityTable_HSed_geo$NAME)
+
+# define palette
+pal <- colorNumeric(palette = "YlGnBu",
+                    domain = min:max)
+
+leaflet() %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  # addTiles() %>% # to show streets more prominently
+  addPolygons(data = equityTable_HSed_geo,
+              fillColor = ~pal(equityTable_HSed_geo$Per_A),
+              fillOpacity = 0.5,
+              color = "white",
+              weight = 2,
+              smoothFactor = 0.2,
+              popup = popup,
+              highlight = highlightOptions(
+                weight = 5,
+                fillOpacity = 0.7,
+                bringToFront = TRUE)) %>%
+  addLegend(pal = pal,
+            values = equityTable_HSed_geo$Per_A,
+            position = "bottomright",
+            opacity = 0.5,
+            title = "High School Degree Attainment<br>among White Adults (25+)")
+```
+
+NOTE: Currently any descriptive text is added manually after examining the output.
+
+***
+## Data Tables
+The following tables show the population estimates and High School degree attainment rates for each census tract. The tables also provide the margains of error associated with each estimate. ACS data is based on a sample and so estimates contain a degree of uncertainty. Larger margins mean the estimate is less accurate. Typically the larger the sample size, the smaller the margin of error. This means in cases where the population of interest is very small (very few adults (over 25) live in a census tract), estimates can be very unreliable. 
+
+### Missing values
+In the poverty rate table, NaN's exist when there is division by zero, that is, when the population of interest in that census tract is estimated to be zero. Poverty rate estimates of zero occur when the number of children estimated to be in poverty is zero.
+
+***
+
+**Population Estimates Table**
+```{r poptable}
+tbl <- equityTable_HSed %>%
+  select(NAME:pop_moe_C) %>%
+  mutate(Tract = str_remove(NAME, paste(", ", county_codes[row,3], ", Virginia", sep="")),
+         "Adults (Over 25)" = paste(pop, "(", "+/-", round(pop_moe, 0), ")"),
+         White = paste(pop_A, "(", "+/-", round(pop_moe_A, 0), ")"),
+         Black = paste(pop_B, "(", "+/-", round(pop_moe_B, 0), ")"),
+         Hispanic = paste(pop_C, "(", "+/-", round(pop_moe_C, 0), ")")) %>%
+  select(Tract, "Adults (Over 25)", White, Black, Hispanic) %>%
+  mutate(Tract = str_remove(Tract, ", Virginia"))
+
+kable(tbl, align = c('l','c','c','c','c'), digits = 0) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+     footnote(general = "Margins of error are shown in parentheses and indicate that the population could be more or less than the estimate by the value of the margin of error.")
+```
+
+**High School Degree Attainment Rate Estimates Table**
+
+```{r HSedtable}
+tbl <- equityTable_HSed %>% select(NAME,Per:Per_moe_C) %>%
+  mutate(Tract = str_remove(NAME, paste(", ", county_codes[row,3], ", Virginia", sep="")),
+         `Pov Rate` = paste(round(Per,1), "(", "+/-", round(Per_moe,1), ")"),
+         `Pov Rate-White` = paste(round(Per_A,1), "(", "+/-", round(Per_moe_A,1), ")"),
+         `Pov Rate-Black` = paste(round(Per_B,1), "(", "+/-", round(Per_moe_B,1), ")"),
+         `Pov Rate-Hispanic` = paste(round(Per_C,1), "(", "+/-", round(Per_moe_C,1), ")")) %>%
+  select(Tract, `Pov Rate`, `Pov Rate-White`, `Pov Rate-Black`, `Pov Rate-Hispanic`) %>%
+  mutate(Tract = str_remove(Tract, ", Virginia"))
+
+kable(tbl, align = c('l', 'c', 'c','c','c'), digits = 1) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+     footnote(general = "Margins of error are shown in parentheses and indicate that the poverty rates could be more or less than the estimate by the value of the margin of error.")
+```
